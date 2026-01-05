@@ -1,0 +1,144 @@
+{
+  "version": 4,
+  "configurePresets": [
+    {
+      "name": "Build-Release32",
+      "generator": "Ninja",
+      "architecture": {
+        "strategy": "external",
+        "value": "Win32"
+      },
+      "binaryDir": "${sourceDir}/build/Release32",
+      "installDir": "${sourceDir}/install/Release32",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/Release32",
+        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/Release32",
+        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "${sourceDir}/bin/lib/Release32",
+        "CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/bin/exe/Release32",
+        "CMAKE_PDB_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/bin/exe/Release32",
+        "CONAN_PROFILE": "conan_profile_release32"
+      },
+      "environment": {
+        "CONAN_PROFILE": "conan_profile_release32"
+      }
+    },
+    {
+      "name": "Build-Release64",
+      "generator": "Ninja",
+      "architecture": {
+        "strategy": "external",
+        "value": "x64"
+      },
+      "binaryDir": "${sourceDir}/build/Release64",
+      "installDir": "${sourceDir}/install/Release64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/Release64",
+        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/Release64",
+        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "${sourceDir}/bin/lib/Release64",
+        "CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/bin/exe/Release64",
+        "CMAKE_PDB_OUTPUT_DIRECTORY_RELEASE": "${sourceDir}/bin/exe/Release64",
+        "CONAN_PROFILE": "conan_profile_release64"
+      },
+      "environment": {
+        "CONAN_PROFILE": "conan_profile_release64"
+      }
+    },
+    {
+      "name": "Build-Debug32",
+      "generator": "Ninja",
+      "architecture": {
+        "strategy": "external",
+        "value": "Win32"
+      },
+      "binaryDir": "${sourceDir}/build/Debug32",
+      "installDir": "${sourceDir}/install/Debug32",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/Debug32",
+        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/Debug32",
+        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "${sourceDir}/bin/lib/Debug32",
+        "CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/bin/exe/Debug32",
+        "CMAKE_PDB_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/bin/exe/Debug32",
+        "CONAN_PROFILE": "conan_profile_debug32"
+      },
+      "environment": {
+        "CONAN_PROFILE": "conan_profile_debug32"
+      }
+    },
+    {
+      "name": "Build-Debug64",
+      "generator": "Ninja",
+      "architecture": {
+        "strategy": "external",
+        "value": "x64"
+      },
+      "binaryDir": "${sourceDir}/build/Debug64",
+      "installDir": "${sourceDir}/install/Debug64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/Debug64",
+        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/Debug64",
+        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "${sourceDir}/bin/lib/Debug64",
+        "CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/bin/exe/Debug64",
+        "CMAKE_PDB_OUTPUT_DIRECTORY_DEBUG": "${sourceDir}/bin/exe/Debug64",
+        "CONAN_PROFILE": "conan_profile_debug64"
+      },
+      "environment": {
+        "CONAN_PROFILE": "conan_profile_debug64"
+      }
+    },
+    {
+      "name": "Build-SolutionVS",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/SolutionVS",
+      "installDir": "${sourceDir}/install/SolutionVS",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/SolutionVS",
+        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/bin/exe/SolutionVS",
+        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "${sourceDir}/bin/lib/SolutionVS",
+        "CONAN_PROFILE": "conan_profile_release64"
+      },
+      "environment": {
+        "CONAN_PROFILE": "conan_profile_release64"
+      }
+    }
+  ],
+    "buildPresets": [
+        {
+            "name": "Build-Release32",
+            "configurePreset": "Build-Release32",
+            "configuration": "Release",
+            "verbose": true,
+            "jobs": 4
+        },
+        {
+            "name": "Build-Release64",
+            "configurePreset": "Build-Release64",
+            "configuration": "Release",
+            "verbose": true,
+            "jobs": 4
+        },
+        {
+            "name": "Build-Debug32",
+            "configurePreset": "Build-Debug32",
+            "configuration": "Debug",
+            "verbose": true,
+            "jobs": 4
+        },
+        {
+            "name": "Build-Debug64",
+            "configurePreset": "Build-Debug64",
+            "configuration": "Debug",
+            "verbose": true,
+            "jobs": 4
+        },
+        {
+            "name": "Build-SolutionVS",
+            "configurePreset": "Build-SolutionVS",
+            "configuration": "Release"
+        }
+    ]
+}

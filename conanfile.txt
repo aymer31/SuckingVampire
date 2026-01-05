@@ -1,0 +1,13 @@
+[requires]
+gtest/1.17.0
+sfml/2.6.2
+
+
+[options]
+sfml/*:shared=True
+
+[generators]
+CMakeDeps
+
+[layout]
+cmake_layout
