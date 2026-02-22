@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <algorithm>
 #include <SFML/Graphics.hpp>
 #include <SFML/System/Vector2.hpp>
 
@@ -17,9 +18,43 @@ struct hitbox
     float width{}, height{};
 };
 
-struct Enemy
+struct Health
 {
-    int hp{3};
+    int hp{5};
+    int maxHp{5};
+};
+
+struct DamageOnContact
+{
+    int damage{1};
+    float radius{35.f};   
+    float cooldown{0.4f}; 
+    float acc{0.f};       
+};
+
+struct Invincibility
+{
+    float time{0.f}; 
+};
+
+struct Enemy{};
+
+
+struct Velocity
+{
+    float vx{0.f};
+    float vy{0.f};
+};
+
+struct Projectile
+{
+    int damage{1};
+    float radius{10.f};
+};
+
+struct Lifetime
+{
+    float time{1.f};
 };
 
 struct Meteor
@@ -43,6 +78,11 @@ struct MeteorSpawner
     float spawnY{-50.f}; 
 
     sf::Vector2f target{640.f, 360.f}; 
+};
+
+struct EnemyAI
+{
+    float speed{60.f}; 
 };
 
 struct Explosive

@@ -1,375 +1,304 @@
 ﻿#include "Game/game.h"
+
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp>
+
 #include "Common/common.h"
+#include "ecs/core.hpp"
+#include "ecs/components.hpp"
+#include "ecs/meteor_system.hpp"
+#include "ecs/exploded_system.hpp"
+#include "ecs/damage_system.hpp"
+#include "ecs/enemychase_system.hpp"
+#include "ecs/playerautoattack_system.hpp"
+#include "ecs/projectilerender_system.hpp"
+#include "ecs/movement_system.hpp"
+#include "ecs/lifetime_system.hpp"
+
 #include <iostream>
+#include <memory>
 #include <vector>
+#include <algorithm>
+#include <random>
 #include <cmath>
 
-enum Direction
+static float randf(float a, float b)
 {
-    Down = 0,
-    Right = 1,
-    Left = 2,
-    Up = 3
-};
-
-struct SpriteRect
-{
-    int x;
-    int y;
-    int width;
-    int height;
-};
-
-SpriteRect getSpriteRect(Direction direction, int frame, int spriteWidth, int spriteHeight)
-{
-    return {frame * spriteWidth, static_cast<int>(direction) * spriteHeight, spriteWidth, spriteHeight};
+    static thread_local std::mt19937 rng{std::random_device{}()};
+    std::uniform_real_distribution<float> dist(std::min(a, b), std::max(a, b));
+    return dist(rng);
 }
 
-struct Player
+static float distance(sf::Vector2f a, sf::Vector2f b)
 {
-    sf::RectangleShape shape;
-    sf::Texture texture;
-    sf::Sprite sprite;
-
-    bool hasSprite = false;
-
-    int currentFrame = 0;
-    Direction currentDirection = Down;
-
-    sf::Clock animationClock;
-    float animationDelay = 0.15f;
-
-    int maxHealth = 100;
-    int health = 100;
-
-    sf::RectangleShape healthBarBack;
-    sf::RectangleShape healthBar;
-
-    void initiatePlayer()
-    {
-        shape.setSize(sf::Vector2f(75.f, 75.f));
-        shape.setPosition((widthWindow / 2.f) - 75.f, (heightWindow / 2.f) - 37.5f);
-
-        if (texture.loadFromFile("assets/characterset.png"))
-        {
-            sprite.setTexture(texture);
-            sprite.setPosition(shape.getPosition());
-            sprite.setScale(shape.getSize().x / 32.f, shape.getSize().y / 32.f);
-            hasSprite = true;
-            updateSprite();
-        }
-        else
-        {
-            std::cout << "Error loading player texture" << std::endl;
-        }
-
-        healthBarBack.setSize(sf::Vector2f(75.f, 8.f));
-        healthBarBack.setFillColor(sf::Color(50, 50, 50));
-        healthBarBack.setPosition(shape.getPosition().x, shape.getPosition().y - 12.f);
-
-        healthBar.setSize(sf::Vector2f(75.f, 8.f));
-        healthBar.setFillColor(sf::Color::Green);
-        healthBar.setPosition(shape.getPosition().x, shape.getPosition().y - 12.f);
-    }
-
-    void updateSprite()
-    {
-        if (!hasSprite)
-            return;
-
-        constexpr int SPRITE_WIDTH = 32;
-        constexpr int SPRITE_HEIGHT = 32;
-
-        SpriteRect rect = getSpriteRect(currentDirection, currentFrame, SPRITE_WIDTH, SPRITE_HEIGHT);
-        sprite.setTextureRect(sf::IntRect(rect.x, rect.y, rect.width, rect.height));
-    }
-
-    void updateAnimation()
-    {
-        if (animationClock.getElapsedTime().asSeconds() >= animationDelay)
-        {
-            currentFrame = (currentFrame + 1) % 4;
-            updateSprite();
-            animationClock.restart();
-        }
-    }
-
-    void updateHealthBar()
-    {
-        float ratio = static_cast<float>(health) / maxHealth;
-        healthBar.setSize(sf::Vector2f(75.f * ratio, 8.f));
-
-        if (ratio > 0.6f)
-            healthBar.setFillColor(sf::Color::Green);
-        else if (ratio > 0.3f)
-            healthBar.setFillColor(sf::Color::Yellow);
-        else
-            healthBar.setFillColor(sf::Color::Red);
-
-        healthBarBack.setPosition(shape.getPosition().x, shape.getPosition().y - 12.f);
-        healthBar.setPosition(shape.getPosition().x, shape.getPosition().y - 12.f);
-    }
-
-    void takeDamage(int amount)
-    {
-        health -= amount;
-        if (health < 0)
-            health = 0;
-        updateHealthBar();
-    }
-
-    void heal(int amount)
-    {
-        health += amount;
-        if (health > maxHealth)
-            health = maxHealth;
-        updateHealthBar();
-    }
-
-    void moveBy(float dx, float dy)
-    {
-        shape.move(dx, dy);
-        if (hasSprite)
-            sprite.move(dx, dy);
-
-        updateHealthBar();
-    }
-
-    void draw(sf::RenderWindow& window)
-    {
-        if (hasSprite)
-            window.draw(sprite);
-        else
-            window.draw(shape);
-
-        window.draw(healthBarBack);
-        window.draw(healthBar);
-    }
-};
-
-struct Enemy
-{
-    sf::CircleShape shape;
-
-    Enemy(sf::Vector2f pos)
-    {
-        shape.setRadius(20.f);
-        shape.setFillColor(sf::Color::Magenta);
-        shape.setOrigin(20.f, 20.f);
-        shape.setPosition(pos);
-    }
-
-    void draw(sf::RenderWindow& window)
-    {
-        window.draw(shape);
-    }
-};
-
-struct Meteor
-{
-    sf::CircleShape shape;
-    sf::Vector2f target;
-    float speed = 4.f;
-    bool exploded = false;
-
-    float damageRadius = 80.f;
-
-    Meteor(sf::Vector2f spawn, sf::Vector2f targetPos)
-        : target(targetPos)
-    {
-        shape.setRadius(15.f);
-        shape.setFillColor(sf::Color::Yellow);
-        shape.setOrigin(15.f, 15.f);
-        shape.setPosition(spawn);
-    }
-
-    bool update()
-    {
-        sf::Vector2f dir = target - shape.getPosition();
-        float len = std::sqrt(dir.x * dir.x + dir.y * dir.y);
-
-        if (len < 3.f)
-        {
-            exploded = true;
-            return true;
-        }
-
-        dir /= len;
-        shape.move(dir * speed);
-        return false;
-    }
-
-    void draw(sf::RenderWindow& window)
-    {
-        window.draw(shape);
-    }
-};
-
-float distance(sf::Vector2f a, sf::Vector2f b)
-{
-    return std::sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    return std::sqrt(dx * dx + dy * dy);
 }
 
-void getplayerMovement(Player& player)
+static void player_input(ecs::Entity player, float dt)
 {
-    constexpr float speed = 1.f;
-    bool isMoving = false;
+    auto& pos = ecs::get_component<Position>(player);
+    const float speed = 350.f;
 
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z))
-    {
-        player.moveBy(0.f, -speed);
-        player.currentDirection = Up;
-        isMoving = true;
-    }
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-    {
-        player.moveBy(0.f, speed);
-        player.currentDirection = Down;
-        isMoving = true;
-    }
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q))
-    {
-        player.moveBy(-speed, 0.f);
-        player.currentDirection = Left;
-        isMoving = true;
-    }
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
-    {
-        player.moveBy(speed, 0.f);
-        player.currentDirection = Right;
-        isMoving = true;
-    }
+        pos.y -= speed * dt;
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+        pos.y += speed * dt;
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Q))
+        pos.x -= speed * dt;
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
+        pos.x += speed * dt;
+}
 
-    if (isMoving)
-        player.updateAnimation();
-    else
-    {
-        player.currentFrame = 0;
-        player.updateSprite();
-    }
+static void purge_dead_meteors(std::vector<ecs::Entity>& meteors)
+{
+    meteors.erase(std::remove_if(meteors.begin(), meteors.end(), [](ecs::Entity e)
+                                 { return !ecs::has_component<Position>(e) || !ecs::has_component<Meteor>(e); }),
+                  meteors.end());
+}
+
+static void purge_dead_enemies(std::vector<ecs::Entity>& enemies)
+{
+    enemies.erase(std::remove_if(enemies.begin(), enemies.end(), [](ecs::Entity e)
+                                 { return !ecs::has_component<Position>(e) || !ecs::has_component<Enemy>(e); }),
+                  enemies.end());
+}
+
+struct GameRuntime
+{
+    ecs::Entity player{};
+
+    std::shared_ptr<MeteorSystem> meteorSys;
+    std::shared_ptr<ExplodedSystem> explodedSys;
+    std::shared_ptr<EnemyChaseSystem> enemyChaseSys;
+    std::shared_ptr<DamageSystem> damageSys;
+    std::shared_ptr<PlayerAutoAttackSystem> playerAttackSys;
+    std::shared_ptr<ProjectileRenderSystem> projectileRenderSys;
+    std::shared_ptr<MovementSystem> moveSys;
+    std::shared_ptr<LifetimeSystem> lifeSys;
+
+    std::vector<ecs::Entity> meteors;
+    std::vector<ecs::Entity> enemies;
+
+    float meteorDelay{1.0f};
+    float meteorAcc{0.f};
+    int maxMeteors{10};
+    float spawnRange{600.f};
+    float spawnAbove{300.f};
+
+    float meteorSpeed{400.f};
+    float meteorRadius{120.f};
+
+    int explosionDamage{2};
+    float explosionIFrames{0.8f};
+};
+
+static bool build_game(GameRuntime& rt)
+{
+    ecs::register_component<Position>();
+    ecs::register_component<hitbox>();
+    ecs::register_component<Enemy>();
+    ecs::register_component<Meteor>();
+    ecs::register_component<Explosive>();
+    ecs::register_component<ExplosionEvent>();
+    ecs::register_component<EnemyAI>();
+    ecs::register_component<Health>();
+    ecs::register_component<DamageOnContact>();
+    ecs::register_component<Invincibility>();
+    ecs::register_component<Velocity>();
+    ecs::register_component<Projectile>();
+    ecs::register_component<Lifetime>();
+    ecs::register_component<AutoAttack>();
+    ecs::register_component<Motion>();
+    ecs::register_component<Lifetime>();
+
+    rt.meteorSys = std::make_shared<MeteorSystem>();
+    ecs::register_system<MeteorSystem>(rt.meteorSys, ecs::create_signature<Position, Meteor, Explosive>());
+
+    rt.explodedSys = std::make_shared<ExplodedSystem>();
+    ecs::register_system<ExplodedSystem>(rt.explodedSys, ecs::create_signature<Position, Explosive>());
+
+    rt.enemyChaseSys = std::make_shared<EnemyChaseSystem>();
+    ecs::register_system<EnemyChaseSystem>(rt.enemyChaseSys, ecs::create_signature<Position, Enemy>());
+
+    rt.damageSys = std::make_shared<DamageSystem>();
+    ecs::register_system<DamageSystem>(rt.damageSys, ecs::create_signature<Position, Enemy, DamageOnContact>());
+
+    rt.playerAttackSys = std::make_shared<PlayerAutoAttackSystem>();
+    ecs::register_system<PlayerAutoAttackSystem>(rt.playerAttackSys, ecs::create_signature<Position, AutoAttack>());
+
+    rt.projectileRenderSys = std::make_shared<ProjectileRenderSystem>();
+    ecs::register_system<ProjectileRenderSystem>(rt.projectileRenderSys, ecs::create_signature<Position, Projectile>());
+
+    rt.moveSys = std::make_shared<MovementSystem>();
+    ecs::register_system<MovementSystem>(rt.moveSys, ecs::create_signature<Position, Motion>());
+
+    rt.lifeSys = std::make_shared<LifetimeSystem>();
+    ecs::register_system<LifetimeSystem>(rt.lifeSys, ecs::create_signature<Lifetime>());
+
+    rt.player = ecs::create_entity();
+    ecs::add_components(rt.player, Position{2500.f, 2500.f}, hitbox{50.f, 50.f}, Health{10, 10},
+                        AutoAttack{1.f, 0.f, 8, 700.f, 1.2f, 1, 25.f});
+
+
+
+    rt.meteors.reserve(64);
+    rt.enemies.reserve(64);
+
+    return true;
 }
 
 void run_game()
 {
-    sf::RenderWindow game(sf::VideoMode(widthWindow, heightWindow), "Game", sf::Style::Default);
+    std::cout << "[Game] entered run_game()\n";
+
+    sf::RenderWindow game(sf::VideoMode(widthWindow, heightWindow), "Game");
     game.setFramerateLimit(120);
 
-    sf::View camera(sf::FloatRect(0.f, 0.f, widthWindow, heightWindow));
+    sf::View camera(sf::FloatRect(0.f, 0.f, (float)widthWindow, (float)heightWindow));
 
-    sf::Texture backgroundTexture;
-    backgroundTexture.loadFromFile("assets/background.png");
-    backgroundTexture.setRepeated(true);
-
-    sf::Sprite background;
-    background.setTexture(backgroundTexture);
+    sf::Texture bgTex;
+    if (!bgTex.loadFromFile("assets/background.png"))
+    {
+        std::cerr << "[Game] Missing asset: assets/background.png\n";
+        return;
+    }
+    bgTex.setRepeated(true);
+    sf::Sprite background(bgTex);
     background.setTextureRect(sf::IntRect(0, 0, 5000, 5000));
 
-    Player player;
-    player.initiatePlayer();
+    GameRuntime rt;
+    if (!build_game(rt))
+        return;
 
-    std::vector<Meteor> meteors;
-    std::vector<Enemy> enemies;
-
-    sf::Clock meteorClock;
-    float meteorDelay = 2.5f;
+    sf::Clock clock;
 
     while (game.isOpen())
     {
-        sf::Event gameEvent;
-        while (game.pollEvent(gameEvent))
+        sf::Event e;
+        while (game.pollEvent(e))
         {
-            if (gameEvent.type == sf::Event::Closed)
+            if (e.type == sf::Event::Closed)
                 game.close();
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
+            if (e.type == sf::Event::KeyPressed && e.key.code == sf::Keyboard::Escape)
                 game.close();
         }
 
-        getplayerMovement(player);
+        float dt = clock.restart().asSeconds();
 
-        // Camera suit le joueur
-        camera.setCenter(player.shape.getPosition());
+        player_input(rt.player, dt);
+
+        const auto& ppos = ecs::get_component<Position>(rt.player);
+        camera.setCenter(ppos.x, ppos.y);
         game.setView(camera);
 
-        // ===== SPAWN METEOR AUTOUR DU JOUEUR =====
-        if (meteorClock.getElapsedTime().asSeconds() >= meteorDelay && enemies.size() < 10)
+        purge_dead_meteors(rt.meteors);
+        purge_dead_enemies(rt.enemies);
+
+        rt.meteorAcc += dt;
+        if (rt.meteorAcc >= rt.meteorDelay && (int)rt.meteors.size() < rt.maxMeteors)
         {
-            float x = player.shape.getPosition().x + (rand() % 600 - 300);
-            float y = player.shape.getPosition().y + (rand() % 600 - 300);
+            rt.meteorAcc = 0.f;
 
-            meteors.emplace_back(sf::Vector2f(x, y - 300.f), // spawn au-dessus
-                                 sf::Vector2f(x, y)          // impact
-            );
+            float x = ppos.x + randf(-rt.spawnRange * 0.5f, rt.spawnRange * 0.5f);
+            float y = ppos.y + randf(-rt.spawnRange * 0.5f, rt.spawnRange * 0.5f);
 
-            meteorClock.restart();
+            float SOL_Y = 3000.f;
+
+            ecs::Entity m = ecs::create_entity();
+            ecs::add_components(m, Position{x, y - rt.spawnAbove},
+                                Meteor{sf::Vector2f(x, SOL_Y), rt.meteorSpeed, rt.meteorRadius, 0.f},
+                                Explosive{rt.meteorRadius, false});
+
+            rt.meteors.push_back(m);
         }
 
-        // ===== UPDATE METEORS =====
-        for (int i = 0; i < meteors.size();)
-        {
-            bool arrived = meteors[i].update();
+        rt.meteorSys->update(dt);
+        rt.explodedSys->update();
+        rt.enemyChaseSys->update(dt, rt.player);
+        rt.damageSys->update(dt, rt.player);
+        rt.playerAttackSys->update(dt);
+        rt.playerAttackSys->update(dt);
+        rt.moveSys->update_Positions(dt);
+        rt.lifeSys->update(dt);
 
-            if (arrived)
+        for (auto en : rt.explodedSys->spawnedEnemies)
+            rt.enemies.push_back(en);
+        
+        {
+            auto& php = ecs::get_component<Health>(rt.player);
+
+            float invTime = 0.f;
+            if (auto* inv = ecs::try_get_component<Invincibility>(rt.player))
+                invTime = inv->time;
+
+            for (const auto& ev : rt.explodedSys->events)
             {
-                if (distance(player.shape.getPosition(), meteors[i].target) <= meteors[i].damageRadius)
-                    player.takeDamage(25);
+                if (distance(sf::Vector2f(ppos.x, ppos.y), sf::Vector2f(ev.x, ev.y)) <= ev.radius)
+                {
+                    if (invTime <= 0.f)
+                    {
+                        php.hp -= rt.explosionDamage;
 
-                if (enemies.size() < 10)
-                    enemies.emplace_back(meteors[i].target);
-
-                meteors.erase(meteors.begin() + i);
+                        if (!ecs::has_component<Invincibility>(rt.player))
+                            ecs::add_components(rt.player, Invincibility{rt.explosionIFrames});
+                        else
+                            ecs::get_component<Invincibility>(rt.player).time = rt.explosionIFrames;
+                    }
+                    break; 
+                }
             }
-            else
-                ++i;
         }
+
+        {
+            const auto& hp = ecs::get_component<Health>(rt.player);
+            if (hp.hp <= 0)
+            {
+                std::cout << "[Game] GAME OVER\n";
+                game.close();
+            }
+        }
+
         game.clear();
         game.draw(background);
+        rt.projectileRenderSys->render(game);
 
-        for (auto& m : meteors)
-            m.draw(game);
+        for (auto en : rt.enemies)
+        {
+            auto* pos = ecs::try_get_component<Position>(en);
+            if (!pos)
+                continue;
 
-        for (auto& e : enemies)
-            e.draw(game);
+            sf::RectangleShape shape(sf::Vector2f(50.f, 50.f));
+            shape.setOrigin(25.f, 25.f);
+            shape.setFillColor(sf::Color::Red);
+            shape.setPosition(pos->x, pos->y);
+            game.draw(shape);
+        }
 
-        player.draw(game);
+        for (auto m : rt.meteors)
+        {
+            auto* pos = ecs::try_get_component<Position>(m);
+            if (!pos)
+                continue;
+
+            sf::CircleShape shape(15.f);
+            shape.setOrigin(15.f, 15.f);
+            shape.setFillColor(sf::Color::Yellow);
+            shape.setPosition(pos->x, pos->y);
+            game.draw(shape);
+        }
+
+        {
+            sf::RectangleShape rect(sf::Vector2f(50.f, 50.f));
+            rect.setOrigin(25.f, 25.f);
+            rect.setFillColor(sf::Color::Green);
+            rect.setPosition(ppos.x, ppos.y);
+            game.draw(rect);
+        }
 
         game.display();
-    }
-}
-
-struct projectile
-{
-    sf::CircleShape shape;
-    sf::Vector2f direction;
-    float speed;
-
-    projectile(sf::Vector2f pos, sf::Vector2f dir, float spd)
-        : direction(dir)
-        , speed(spd)
-    {
-        shape.setRadius(5.f);
-        shape.setFillColor(sf::Color::Red);
-        shape.setPosition(pos);
-    }
-
-    void update()
-    {
-        shape.move(direction * speed);
-    }
-
-    void draw(sf::RenderWindow& window)
-    {
-        window.draw(shape);
-    }
-};
-
-void handleProjectiles(std::vector<projectile>& projectiles, sf::RenderWindow& window)
-{
-    for (auto& proj : projectiles)
-    {
-        proj.update();
-        proj.draw(window);
     }
 }

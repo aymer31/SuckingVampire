@@ -28,6 +28,8 @@ target_link_libraries(ecs_tests
         lib::ecs
         GTest::gtest
         GTest::gtest_main
+        sfml-system sfml-window sfml-graphics
+
 )
 
 add_library(common 
@@ -56,7 +58,10 @@ add_library(game SHARED
 
 target_link_libraries(
     game PUBLIC
-    sfml-system sfml-window sfml-graphics common
+    lib::ecs
+        GTest::gtest
+        GTest::gtest_main
+        sfml-system sfml-window sfml-graphics
 )
 
 target_include_directories(
