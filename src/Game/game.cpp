@@ -15,6 +15,7 @@
 #include "ecs/projectilerender_system.hpp"
 #include "ecs/movement_system.hpp"
 #include "ecs/lifetime_system.hpp"
+#include "ecs/projectilehit_system.hpp"
 
 #include <iostream>
 #include <memory>
@@ -78,6 +79,7 @@ struct GameRuntime
     std::shared_ptr<ProjectileRenderSystem> projectileRenderSys;
     std::shared_ptr<MovementSystem> moveSys;
     std::shared_ptr<LifetimeSystem> lifeSys;
+    std::shared_ptr<ProjectileHitSystem> projectileHitSys;
 
     std::vector<ecs::Entity> meteors;
     std::vector<ecs::Entity> enemies;
@@ -114,6 +116,7 @@ static bool build_game(GameRuntime& rt)
     ecs::register_component<Motion>();
     ecs::register_component<Lifetime>();
 
+
     rt.meteorSys = std::make_shared<MeteorSystem>();
     ecs::register_system<MeteorSystem>(rt.meteorSys, ecs::create_signature<Position, Meteor, Explosive>());
 
@@ -137,6 +140,9 @@ static bool build_game(GameRuntime& rt)
 
     rt.lifeSys = std::make_shared<LifetimeSystem>();
     ecs::register_system<LifetimeSystem>(rt.lifeSys, ecs::create_signature<Lifetime>());
+
+    rt.projectileHitSys = std::make_shared<ProjectileHitSystem>();
+    ecs::register_system<ProjectileHitSystem>(rt.projectileHitSys, ecs::create_signature<Position, Projectile>());
 
     rt.player = ecs::create_entity();
     ecs::add_components(rt.player, Position{2500.f, 2500.f}, hitbox{50.f, 50.f}, Health{10, 10},
@@ -223,6 +229,7 @@ void run_game()
         rt.playerAttackSys->update(dt);
         rt.moveSys->update_Positions(dt);
         rt.lifeSys->update(dt);
+        rt.projectileHitSys->update(rt.enemies);
 
         for (auto en : rt.explodedSys->spawnedEnemies)
             rt.enemies.push_back(en);
